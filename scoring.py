@@ -108,3 +108,4 @@ class Scoring:
         print(f"\nMode 2 (User Guesses):")
         print(f"  Games: {stats['mode2_games']}, Wins: {stats['mode2_wins']}")
 
+

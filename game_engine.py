@@ -6,7 +6,7 @@ from config import MIN_NUMBER, MAX_NUMBER, MAX_QUESTIONS
 class GameEngine:
     """Core game engine managing game state."""
     
-    def __init__(self, min_num=MIN_NUMBER, max_num=MAX_NUMBER, max_questions=MAX_QUESTIONS):
+    def __init__(self, min_num=MIN_NUMBER, max_num=MAX_NUMBER, max_questions=MAX_QUESTIONS, llm_service=None):
         """
         Initialize game engine.
         
@@ -14,8 +14,10 @@ class GameEngine:
             min_num: Minimum number in range
             max_num: Maximum number in range
             max_questions: Maximum questions allowed
+            llm_service: LLMService instance (required for filtering)
         """
-        self.range_manager = RangeManager(min_num, max_num)
+        self.llm_service = llm_service
+        self.range_manager = RangeManager(min_num, max_num, llm_service=llm_service)
         self.min_num = min_num
         self.max_num = max_num
         self.max_questions = max_questions

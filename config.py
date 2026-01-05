@@ -18,3 +18,4 @@ MAX_QUESTIONS = 10
 # Scoring file path
 SCORING_FILE = "game_stats.json"
 
+

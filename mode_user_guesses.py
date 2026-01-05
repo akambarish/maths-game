@@ -1,12 +1,10 @@
 """Mode 2: User asks questions to guess computer's number."""
 
 import random
-import re
-import math
 from game_engine import GameEngine
 from llm_service import LLMService
 from scoring import Scoring
-from config import MIN_NUMBER, MAX_NUMBER
+from config import MIN_NUMBER, MAX_NUMBER, MAX_QUESTIONS
 
 def play_user_guesses_mode():
     """Play the game mode where user guesses computer's number."""
@@ -20,148 +18,109 @@ def play_user_guesses_mode():
     secret_number = random.randint(MIN_NUMBER, MAX_NUMBER)
     
     # Initialize game components
-    engine = GameEngine()
-    engine.set_secret_number(secret_number)
     llm_service = LLMService()
+    engine = GameEngine(llm_service=llm_service)
+    engine.set_secret_number(secret_number)
     scoring = Scoring()
+
+    # Show initial possibilities count once at game start
+    print(f"Possible numbers remaining: {engine.get_possible_count()}\n")
     
     question_count = 0
+    guess_attempts = 0
+    max_guesses = 3
+    won = False
+    exhausted_msg_shown = False
     
     # Game loop
-    while True:
+    while not won and guess_attempts < max_guesses:
+        # If user has exhausted questions, switch to guess-only mode automatically
+        if question_count >= MAX_QUESTIONS:
+            if not exhausted_msg_shown:
+                remaining_guesses = max_guesses - guess_attempts
+                print(f"You have exhausted max no of questions. Now You have {remaining_guesses} chances to guess.")
+                exhausted_msg_shown = True
+
+            # Guess-only phase (no more questions allowed)
+            guess_input = input(f"Enter your guess ({MIN_NUMBER}-{MAX_NUMBER}): ").strip()
+            guess_attempts += 1
+
+            try:
+                guess = int(guess_input)
+            except ValueError:
+                print("Invalid guess.")
+                continue
+
+            if not (MIN_NUMBER <= guess <= MAX_NUMBER):
+                print("Invalid guess.")
+                continue
+
+            if guess == secret_number:
+                print("Congratulations! You guessed correctly!")
+                won = True
+                break
+
+            print("Incorrect.")
+            continue
+
         user_input = input("Your question (or 'guess' to make a guess): ").strip()
-        
-        if user_input.lower() == "guess":
-            break
-        
+
         if not user_input:
             print("Please enter a question or 'guess'.")
             continue
-        
-        question_count += 1
-        
-        # Get user's expected answer
-        print("\nWhat do you think the answer is?")
-        while True:
-            expected_answer = input("Your expected answer (Yes/No): ").strip()
-            if expected_answer.lower() in ["yes", "y", "no", "n"]:
-                expected_answer = "Yes" if expected_answer.lower() in ["yes", "y"] else "No"
+
+        if user_input.lower() == "guess":
+            guess_input = input(f"Enter your guess ({MIN_NUMBER}-{MAX_NUMBER}): ").strip()
+            guess_attempts += 1
+
+            try:
+                guess = int(guess_input)
+            except ValueError:
+                print("Invalid guess.")
+                continue
+
+            if not (MIN_NUMBER <= guess <= MAX_NUMBER):
+                print("Invalid guess.")
+                continue
+
+            if guess == secret_number:
+                print("Congratulations! You guessed correctly!")
+                won = True
                 break
-            else:
-                print("Please answer with 'Yes' or 'No' (or 'Y'/'N').")
-        
-        # Determine actual answer for the secret number
-        actual_answer = determine_answer_for_number(secret_number, user_input)
-        
-        # Validate answer using LLM (as a check)
+
+            print("Incorrect.")
+            continue
+
+        question_count += 1
+
+        # Determine answer for the secret number using LLM
         try:
-            is_correct_llm = llm_service.validate_answer(secret_number, user_input, expected_answer)
-            # Use deterministic answer as source of truth, LLM as validation
-            is_correct = (expected_answer == actual_answer)
-            
-            if is_correct:
-                print(f"✓ Correct! The answer is: {actual_answer}")
-            else:
-                print(f"✗ Incorrect. The actual answer is: {actual_answer}")
-            
-            # Record Q&A for tracking (though we don't use range manager in this mode)
+            actual_answer = llm_service.determine_answer_for_number(secret_number, user_input)
+
+            print(f"Answer: {actual_answer}")
+
+            # Record Q&A for tracking and range narrowing
             engine.record_qa(user_input, actual_answer)
-            
+
         except Exception as e:
-            print(f"Error validating answer: {e}")
+            print(f"Error determining answer: {e}")
             print("Please try again.")
             question_count -= 1
             continue
-        
+
         print()  # Empty line
+
+        # After the 10th question, automatically move to guess mode
+        if question_count >= MAX_QUESTIONS:
+            remaining_guesses = max_guesses - guess_attempts
+            print(f"You have exhausted max no of questions. Now You have {remaining_guesses} chances to guess.")
+            exhausted_msg_shown = True
     
-    # User makes guess
-    print(f"\nYou asked {question_count} question(s).")
-    while True:
-        try:
-            guess_input = input(f"Enter your guess ({MIN_NUMBER}-{MAX_NUMBER}): ").strip()
-            guess = int(guess_input)
-            if MIN_NUMBER <= guess <= MAX_NUMBER:
-                break
-            else:
-                print(f"Please enter a number between {MIN_NUMBER} and {MAX_NUMBER}.")
-        except ValueError:
-            print("Please enter a valid number.")
-    
-    # Check guess
-    print(f"\n{'='*50}")
-    print(f"Your guess: {guess}")
-    print(f"Secret number: {secret_number}")
-    
-    if guess == secret_number:
-        print("🎉 Congratulations! You guessed correctly!")
-        won = True
-    else:
-        print(f"❌ Incorrect. The secret number was {secret_number}.")
-        won = False
-    
+    if not won and guess_attempts >= max_guesses:
+        print(f"You have exhausted all guess attempts. You lose. The secret number was {secret_number}.")
+
     # Record game
     scoring.record_game(won, question_count, mode=2)
     
     return won
-
-def determine_answer_for_number(number, question):
-    """
-    Determine the correct Yes/No answer for a question about a specific number.
-    This is used to provide the actual answer for the secret number.
-    """
-    question_lower = question.lower()
-    
-    # Even/Odd
-    if "even" in question_lower:
-        return "Yes" if number % 2 == 0 else "No"
-    if "odd" in question_lower:
-        return "Yes" if number % 2 != 0 else "No"
-    
-    # Comparison
-    patterns = [
-        (r"less than (\d+)", lambda n, v: n < v),
-        (r"greater than (\d+)", lambda n, v: n > v),
-        (r"more than (\d+)", lambda n, v: n > v),
-        (r"less than or equal to (\d+)", lambda n, v: n <= v),
-        (r"greater than or equal to (\d+)", lambda n, v: n >= v),
-        (r"at least (\d+)", lambda n, v: n >= v),
-        (r"at most (\d+)", lambda n, v: n <= v),
-        (r"(\d+) or less", lambda n, v: n <= v),
-        (r"(\d+) or more", lambda n, v: n >= v),
-    ]
-    
-    for pattern, condition_func in patterns:
-        match = re.search(pattern, question_lower)
-        if match:
-            value = int(match.group(1))
-            return "Yes" if condition_func(number, value) else "No"
-    
-    # Divisibility
-    div_match = re.search(r"divisible by (\d+)", question_lower)
-    if div_match:
-        divisor = int(div_match.group(1))
-        return "Yes" if number % divisor == 0 else "No"
-    
-    # Perfect square
-    if "perfect square" in question_lower or ("square" in question_lower and "root" not in question_lower):
-        root = int(math.sqrt(number))
-        return "Yes" if root * root == number else "No"
-    
-    # Prime
-    if "prime" in question_lower:
-        if number < 2:
-            return "No"
-        if number == 2:
-            return "Yes"
-        if number % 2 == 0:
-            return "No"
-        for i in range(3, int(math.sqrt(number)) + 1, 2):
-            if number % i == 0:
-                return "No"
-        return "Yes"
-    
-    # If we can't determine, use LLM fallback - but for now return "Yes" as default
-    # In practice, LLM validation should handle edge cases
-    return "Yes"
 
