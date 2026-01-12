@@ -112,9 +112,10 @@ def play_user_guesses_mode():
 
         # After the 10th question, automatically move to guess mode
         if question_count >= MAX_QUESTIONS:
-            remaining_guesses = max_guesses - guess_attempts
-            print(f"You have exhausted max no of questions. Now You have {remaining_guesses} chances to guess.")
-            exhausted_msg_shown = True
+            if not exhausted_msg_shown:
+                remaining_guesses = max_guesses - guess_attempts
+                print(f"You have exhausted max no of questions. Now You have {remaining_guesses} chances to guess.")
+                exhausted_msg_shown = True
     
     if not won and guess_attempts >= max_guesses:
         print(f"You have exhausted all guess attempts. You lose. The secret number was {secret_number}.")

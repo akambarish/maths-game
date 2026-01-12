@@ -103,8 +103,6 @@ class Scoring:
         if stats['best_game_questions'] is not None:
             print(f"Best game: {stats['best_game_questions']} questions")
         
-        print(f"\nMode 1 (Computer Guesses):")
-        print(f"  Games: {stats['mode1_games']}, Wins: {stats['mode1_wins']}")
         print(f"\nMode 2 (User Guesses):")
         print(f"  Games: {stats['mode2_games']}, Wins: {stats['mode2_wins']}")
 
