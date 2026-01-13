@@ -106,7 +106,7 @@ export default function GamePage() {
 
   return (
     <div>
-      <h3 style={{ marginTop: 0 }}>Mode 2: You guess the computer&apos;s number</h3>
+      <h3 style={{ marginTop: 0 }}>You guess the computer&apos;s number</h3>
 
       {error && (
         <div style={{ padding: 12, border: '1px solid #f99', background: '#fff5f5', marginBottom: 12 }}>
